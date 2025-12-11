@@ -32,7 +32,7 @@
             CbSeletorDia = new ComboBox();
             btnImportar = new Button();
             btnRecarregarBanco = new Button();
-            btnSalvarEscala = new Button();
+            btnImprimir = new Button();
             tabPage2 = new TabPage();
             dataGridView2 = new DataGridView();
             tabPage1 = new TabPage();
@@ -51,37 +51,37 @@
             // CbSeletorDia
             // 
             CbSeletorDia.FormattingEnabled = true;
-            CbSeletorDia.Location = new Point(172, 0);
+            CbSeletorDia.Location = new Point(281, 16);
             CbSeletorDia.Name = "CbSeletorDia";
-            CbSeletorDia.Size = new Size(159, 23);
+            CbSeletorDia.Size = new Size(64, 23);
             CbSeletorDia.TabIndex = 1;
             // 
             // btnImportar
             // 
-            btnImportar.Location = new Point(391, 10);
+            btnImportar.Location = new Point(351, 3);
             btnImportar.Name = "btnImportar";
-            btnImportar.Size = new Size(75, 23);
+            btnImportar.Size = new Size(115, 47);
             btnImportar.TabIndex = 2;
-            btnImportar.Text = "button1";
+            btnImportar.Text = "Carregar escala mensal";
             btnImportar.UseVisualStyleBackColor = true;
             // 
             // btnRecarregarBanco
             // 
-            btnRecarregarBanco.Location = new Point(553, 10);
+            btnRecarregarBanco.Location = new Point(732, 17);
             btnRecarregarBanco.Name = "btnRecarregarBanco";
             btnRecarregarBanco.Size = new Size(75, 23);
             btnRecarregarBanco.TabIndex = 3;
             btnRecarregarBanco.Text = "button1";
             btnRecarregarBanco.UseVisualStyleBackColor = true;
             // 
-            // btnSalvarEscala
+            // btnImprimir
             // 
-            btnSalvarEscala.Location = new Point(472, 12);
-            btnSalvarEscala.Name = "btnSalvarEscala";
-            btnSalvarEscala.Size = new Size(75, 23);
-            btnSalvarEscala.TabIndex = 4;
-            btnSalvarEscala.Text = "button1";
-            btnSalvarEscala.UseVisualStyleBackColor = true;
+            btnImprimir.Location = new Point(472, 3);
+            btnImprimir.Name = "btnImprimir";
+            btnImprimir.Size = new Size(115, 47);
+            btnImprimir.TabIndex = 4;
+            btnImprimir.Text = "Imprimir";
+            btnImprimir.UseVisualStyleBackColor = true;
             // 
             // tabPage2
             // 
@@ -89,7 +89,7 @@
             tabPage2.Location = new Point(4, 24);
             tabPage2.Name = "tabPage2";
             tabPage2.Padding = new Padding(3);
-            tabPage2.Size = new Size(1339, 638);
+            tabPage2.Size = new Size(1353, 638);
             tabPage2.TabIndex = 1;
             tabPage2.Text = "EscalaDiaria";
             tabPage2.UseVisualStyleBackColor = true;
@@ -110,9 +110,7 @@
             dataGridView2.GridColor = Color.DarkGray;
             dataGridView2.Location = new Point(3, 3);
             dataGridView2.Name = "dataGridView2";
-            
-            
-            dataGridView2.Size = new Size(1333, 632);
+            dataGridView2.Size = new Size(1347, 632);
             dataGridView2.TabIndex = 1;
             // 
             // tabPage1
@@ -121,7 +119,7 @@
             tabPage1.Location = new Point(4, 24);
             tabPage1.Name = "tabPage1";
             tabPage1.Padding = new Padding(3);
-            tabPage1.Size = new Size(1339, 638);
+            tabPage1.Size = new Size(1353, 638);
             tabPage1.TabIndex = 0;
             tabPage1.Text = "EscalaMensal";
             tabPage1.UseVisualStyleBackColor = true;
@@ -132,7 +130,7 @@
             dataGridView1.Dock = DockStyle.Fill;
             dataGridView1.Location = new Point(3, 3);
             dataGridView1.Name = "dataGridView1";
-            dataGridView1.Size = new Size(1333, 632);
+            dataGridView1.Size = new Size(1347, 632);
             dataGridView1.TabIndex = 2;
             // 
             // tabControl1
@@ -143,7 +141,7 @@
             tabControl1.Location = new Point(3, 29);
             tabControl1.Name = "tabControl1";
             tabControl1.SelectedIndex = 0;
-            tabControl1.Size = new Size(1347, 666);
+            tabControl1.Size = new Size(1361, 666);
             tabControl1.TabIndex = 0;
             // 
             // tabPage3
@@ -151,13 +149,14 @@
             tabPage3.Controls.Add(flowLayoutPanel1);
             tabPage3.Location = new Point(4, 24);
             tabPage3.Name = "tabPage3";
-            tabPage3.Size = new Size(1339, 638);
+            tabPage3.Size = new Size(1353, 638);
             tabPage3.TabIndex = 2;
             tabPage3.Text = "Itinerários";
             tabPage3.UseVisualStyleBackColor = true;
             // 
             // flowLayoutPanel1
             // 
+            flowLayoutPanel1.BackColor = Color.Gray;
             flowLayoutPanel1.Location = new Point(3, 3);
             flowLayoutPanel1.Name = "flowLayoutPanel1";
             flowLayoutPanel1.Size = new Size(1333, 630);
@@ -167,8 +166,8 @@
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(1355, 698);
-            Controls.Add(btnSalvarEscala);
+            ClientSize = new Size(1368, 698);
+            Controls.Add(btnImprimir);
             Controls.Add(btnRecarregarBanco);
             Controls.Add(btnImportar);
             Controls.Add(CbSeletorDia);
@@ -189,7 +188,7 @@
         private ComboBox CbSeletorDia;
         private Button btnImportar;
         private Button btnRecarregarBanco;
-        private Button btnSalvarEscala;
+        private Button btnImprimir;
         private TabPage tabPage2;
         private DataGridView dataGridView2;
         private TabPage tabPage1;

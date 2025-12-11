@@ -7,6 +7,7 @@ using System.Drawing;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Windows.Forms;
+using System.Drawing.Printing; // Necessário para impressão
 
 namespace Escala
 {
@@ -41,7 +42,10 @@ namespace Escala
                 dataGridView2.CurrentCellDirtyStateChanged += DataGridView2_CurrentCellDirtyStateChanged;
                 // Removemos a linha lateral para ficar mais limpo
                 dataGridView2.RowHeadersVisible = false;
-                
+                // --- LIGA O BOTÃO DE IMPRIMIR AQUI ---
+                // (Supondo que você criou o botão com o nome btnImprimir no Designer)
+                if (btnImprimir != null) btnImprimir.Click += btnImprimir_Click;
+
             }
         }
 
@@ -157,6 +161,79 @@ namespace Escala
             if (flowLayoutPanel1 != null) AtualizarItinerarios();
         }
 
+
+        // =========================================================
+        // 7. LÓGICA DE IMPRESSÃO (GRID + ITINERÁRIOS)
+        // =========================================================
+
+        private void btnImprimir_Click(object sender, EventArgs e)
+        {
+            PrintDocument pd = new PrintDocument();
+            pd.PrintPage += new PrintPageEventHandler(ImprimirConteudo);
+
+            // Abre a visualização antes de imprimir
+            PrintPreviewDialog ppd = new PrintPreviewDialog();
+            ppd.Document = pd;
+            ppd.WindowState = FormWindowState.Maximized;
+            ppd.ShowDialog();
+        }
+
+        private void ImprimirConteudo(object sender, PrintPageEventArgs e)
+        {
+            // 1. CAPTURA A IMAGEM DO GRID (ESCALA)
+            // Redimensiona temporariamente para caber tudo se tiver rolagem
+            int heightOriginalGrid = dataGridView2.Height;
+            dataGridView2.Height = dataGridView2.RowCount * dataGridView2.RowTemplate.Height + dataGridView2.ColumnHeadersHeight;
+
+            Bitmap bmpGrid = new Bitmap(dataGridView2.Width, dataGridView2.Height);
+            dataGridView2.DrawToBitmap(bmpGrid, new Rectangle(0, 0, dataGridView2.Width, dataGridView2.Height));
+
+            // Restaura tamanho original
+            dataGridView2.Height = heightOriginalGrid;
+
+            // 2. CAPTURA A IMAGEM DOS ITINERÁRIOS (CARTÕES)
+            // Precisamos calcular a altura total dos cartões dentro do painel
+            int alturaPainel = 0;
+            foreach (System.Windows.Forms.Control c in flowLayoutPanel1.Controls)
+                alturaPainel = Math.Max(alturaPainel, c.Bottom);
+            alturaPainel += 20; // Margem
+
+            // Cria bitmap do tamanho total do conteúdo
+            Bitmap bmpItinerario = new Bitmap(flowLayoutPanel1.Width, Math.Max(alturaPainel, 100)); // Minimo 100
+            flowLayoutPanel1.DrawToBitmap(bmpItinerario, new Rectangle(0, 0, flowLayoutPanel1.Width, Math.Max(alturaPainel, flowLayoutPanel1.Height)));
+
+            // 3. DESENHA NA FOLHA DE PAPEL
+            float y = e.MarginBounds.Top;
+            float x = e.MarginBounds.Left;
+            float larguraUtil = e.MarginBounds.Width;
+
+            // Cabeçalho
+            System.Drawing.Font fonteTitulo = new System.Drawing.Font("Arial", 16, FontStyle.Bold);
+            e.Graphics.DrawString($"Escala do Dia {_diaSelecionado}", fonteTitulo, Brushes.Black, x, y);
+            y += 40;
+
+            // Desenha o Grid (Ajustando a largura para caber na folha)
+            float ratioGrid = (float)bmpGrid.Width / (float)bmpGrid.Height;
+            float alturaGridNaFolha = larguraUtil / ratioGrid;
+
+            // Se o grid for muito alto, limita para não sumir da página
+            if (alturaGridNaFolha > 400) alturaGridNaFolha = 400;
+
+            e.Graphics.DrawImage(bmpGrid, x, y, larguraUtil, alturaGridNaFolha);
+            y += alturaGridNaFolha + 30; // Pula linha
+
+            // Título Itinerários
+            e.Graphics.DrawString("Itinerários / Cartões", fonteTitulo, Brushes.Black, x, y);
+            y += 30;
+
+            // Desenha o Painel de Cartões
+            // Se não couber na página, o código simples vai cortar (para MVP serve)
+            // Se precisar quebrar página é bem mais complexo.
+            float ratioItin = (float)bmpItinerario.Width / (float)bmpItinerario.Height;
+            float alturaItinNaFolha = larguraUtil / ratioItin;
+
+            e.Graphics.DrawImage(bmpItinerario, x, y, larguraUtil, alturaItinNaFolha);
+        }
         // =========================================================
         // 3. VISUALIZAÇÃO (ITINERÁRIOS NA ABA 3)
         // =========================================================
