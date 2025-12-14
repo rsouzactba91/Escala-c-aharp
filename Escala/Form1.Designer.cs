@@ -40,6 +40,7 @@
             tabControl1 = new TabControl();
             tabPage3 = new TabPage();
             flowLayoutPanel1 = new FlowLayoutPanel();
+            lblClima = new Label();
             tabPage2.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dataGridView2).BeginInit();
             tabPage1.SuspendLayout();
@@ -67,18 +68,19 @@
             // 
             // btnRecarregarBanco
             // 
-            btnRecarregarBanco.Location = new Point(732, 17);
+            btnRecarregarBanco.Location = new Point(472, 3);
             btnRecarregarBanco.Name = "btnRecarregarBanco";
-            btnRecarregarBanco.Size = new Size(75, 23);
+            btnRecarregarBanco.Size = new Size(115, 44);
             btnRecarregarBanco.TabIndex = 3;
-            btnRecarregarBanco.Text = "button1";
+            btnRecarregarBanco.Text = "Limpar Horários";
             btnRecarregarBanco.UseVisualStyleBackColor = true;
+            btnRecarregarBanco.Click += btnRecarregarBanco_Click;
             // 
             // btnImprimir
             // 
-            btnImprimir.Location = new Point(472, 3);
+            btnImprimir.Location = new Point(593, 3);
             btnImprimir.Name = "btnImprimir";
-            btnImprimir.Size = new Size(115, 47);
+            btnImprimir.Size = new Size(115, 44);
             btnImprimir.TabIndex = 4;
             btnImprimir.Text = "Imprimir";
             btnImprimir.UseVisualStyleBackColor = true;
@@ -162,11 +164,22 @@
             flowLayoutPanel1.Size = new Size(1333, 630);
             flowLayoutPanel1.TabIndex = 0;
             // 
+            // lblClima
+            // 
+            lblClima.AutoSize = true;
+            lblClima.Font = new Font("Segoe UI", 14.25F, FontStyle.Regular, GraphicsUnit.Point, 0);
+            lblClima.Location = new Point(842, 15);
+            lblClima.Name = "lblClima";
+            lblClima.Size = new Size(205, 25);
+            lblClima.TabIndex = 5;
+            lblClima.Text = "Carregando previsão ...";
+            // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(1368, 698);
+            Controls.Add(lblClima);
             Controls.Add(btnImprimir);
             Controls.Add(btnRecarregarBanco);
             Controls.Add(btnImportar);
@@ -182,6 +195,7 @@
             tabControl1.ResumeLayout(false);
             tabPage3.ResumeLayout(false);
             ResumeLayout(false);
+            PerformLayout();
         }
 
         #endregion
@@ -196,5 +210,6 @@
         private DataGridView dataGridView1;
         private TabPage tabPage3;
         private FlowLayoutPanel flowLayoutPanel1;
+        private Label lblClima;
     }
 }
