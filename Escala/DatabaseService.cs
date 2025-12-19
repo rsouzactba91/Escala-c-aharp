@@ -344,5 +344,25 @@ namespace Escala
 
             return "12:40 X 21:00"; // Retorna esse se não tiver nada salvo
         }
+        // Coloque isso dentro da classe DatabaseService
+
+        private static string ConfigFileIntermediario = "config_intermediario.txt";
+
+        public static void SetHorarioPadraoIntermediario(string horario)
+        {
+            try { System.IO.File.WriteAllText(ConfigFileIntermediario, horario); } catch { }
+        }
+
+        public static string GetHorarioPadraoIntermediario()
+        {
+            try
+            {
+                if (System.IO.File.Exists(ConfigFileIntermediario))
+                    return System.IO.File.ReadAllText(ConfigFileIntermediario);
+            }
+            catch { }
+
+            return "12:40 X 21:00"; // Padrão se não tiver nada salvo
+        }
     }
 }

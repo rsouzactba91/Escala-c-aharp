@@ -357,6 +357,11 @@ namespace Escala
 
         private void btnImprimir_Click(object? sender, EventArgs e)
         {
+            // Salva a aba atual para voltar nela depois
+            var abaAnterior = tabControl1.SelectedTab;
+            // Força ir para a aba do grid inicialmente (para garantir que a primeira página saia certa)
+            tabControl1.SelectedTab = tabPage2; 
+
             PrintDocument pd = new PrintDocument();
             pd.DefaultPageSettings.Landscape = true;
             pd.DefaultPageSettings.Margins = new Margins(10, 10, 10, 10);
@@ -365,7 +370,12 @@ namespace Escala
             PrintPreviewDialog ppd = new PrintPreviewDialog();
             ppd.Document = pd;
             ppd.WindowState = FormWindowState.Maximized;
+            
+            // O Preview gera o documento. Durante este processo, o ImprimirConteudo vai trocar as abas.
             ppd.ShowDialog();
+
+            // Restaura a aba que o usuário estava
+            tabControl1.SelectedTab = abaAnterior;
         }
 
         private void CbSeletorDia_SelectedIndexChanged(object? sender, EventArgs e)
@@ -460,6 +470,7 @@ namespace Escala
 
             // Agora a função vai encontrar o Windison na listaCFTV!
             AplicarLogicaFolguistaCFTV(listaCFTV);
+            AplicarLogicaIntermediarioCFTV(listaCFTV);
 
             if (flowLayoutPanel1 != null) AtualizarItinerarios();
         }
@@ -555,6 +566,61 @@ namespace Escala
             if (partes.Length == 2)
             {
                 PintarIntervaloBranco(rowFolguista, partes[0].Trim(), partes[1].Trim());
+            }
+        }
+        private void AplicarLogicaIntermediarioCFTV(List<DataRow> listaCFTV)
+        {
+            // 1. Define o Horário Padrão (Vindo do ComboBox da Aba 4)
+            string horarioPadrao = DatabaseService.GetHorarioPadraoIntermediario();
+            if (string.IsNullOrWhiteSpace(horarioPadrao)) horarioPadrao = "12:40 X 21:00";
+
+            // 2. Varre a lista procurando quem tem o horário "12:40 x 20:40"
+            foreach (DataRow dados in listaCFTV)
+            {
+                string horarioExcel = dados[INDEX_HORARIO]?.ToString() ?? "";
+                string nome = dados[INDEX_NOME]?.ToString()?.ToUpper() ?? "";
+
+                // A LÓGICA CORRETA AGORA:
+                // Procura especificamente pelo texto "12:40" e "20:40" na mesma célula
+                if (horarioExcel.Contains("12:40") && horarioExcel.Contains("21:00"))
+                {
+                    // Achamos o Intermediário! Agora vamos achá-lo no Grid visual.
+                    DataGridViewRow rowInter = null;
+                    foreach (DataGridViewRow row in dataGridView2.Rows)
+                    {
+                        string nomeNoGrid = row.Cells["Nome"].Value?.ToString()?.ToUpper() ?? "";
+
+                        // Tenta achar o nome exato ou contendo parte
+                        if (nomeNoGrid == nome || (nomeNoGrid.Contains(nome) && nome.Length > 3))
+                        {
+                            rowInter = row;
+                            break;
+                        }
+                    }
+
+                    if (rowInter != null)
+                    {
+                        // 3. Reseta a cor para cinza (limpa formatações anteriores)
+                        for (int c = 3; c < dataGridView2.Columns.Count; c++)
+                        {
+                            rowInter.Cells[c].Style.BackColor = System.Drawing.Color.DarkGray;
+                            rowInter.Cells[c].Style.ForeColor = System.Drawing.Color.White;
+                            rowInter.Cells[c].ReadOnly = true;
+                        }
+
+                        // 4. Aplica o horário do ComboBox e Pinta de Branco
+                        rowInter.Cells["HORARIO"].Value = horarioPadrao;
+
+                        var partes = horarioPadrao.Split(new[] { 'x', 'X' }, StringSplitOptions.RemoveEmptyEntries);
+                        if (partes.Length == 2)
+                        {
+                            PintarIntervaloBranco(rowInter, partes[0].Trim(), partes[1].Trim());
+                        }
+                    }
+                    // Como geralmente só tem 1 intermediário, podemos parar de procurar (break)
+                    // Se tiver mais de um, remova o 'break' abaixo.
+                    break;
+                }
             }
         }
 
@@ -902,6 +968,10 @@ namespace Escala
 
             if (_paginaAtual == 0)
             {
+                // GARANTIA: Ativa a aba do Grid e força o desenho
+                tabControl1.SelectedTab = tabPage2;
+                Application.DoEvents(); 
+
                 e.Graphics.DrawString($"Escala do Dia {_diaSelecionado}", fonteT, Brushes.Black, x, y);
                 y += 30;
                 e.Graphics.DrawString(lblClima.Text, fonteC, Brushes.DarkSlateGray, x, y);
@@ -923,6 +993,10 @@ namespace Escala
             }
             else
             {
+                // GARANTIA: Ativa a aba de Itinerários e força o desenho
+                tabControl1.SelectedTab = tabPage3;
+                Application.DoEvents(); 
+
                 e.Graphics.DrawString("Itinerários", fonteT, Brushes.Black, x, y);
                 y += 40;
                 int hP = 0;
@@ -989,26 +1063,44 @@ namespace Escala
                 if (alvo < hoje.Date) alvo = alvo.AddMonths(1);
                 int diff = (alvo - hoje.Date).Days;
 
-                if (diff == 0) lblClima.Text = $"Hoje: {res["temp"]}°C - {res["description"]}";
-                else if (diff < 10)
-                {
-                    var f = res["forecast"]?[diff];
-                    lblClima.Text = $"{f["weekday"]} ({dia}): {f["max"]}°C/{f["min"]}°C - {f["description"]}";
-                }
-                else lblClima.Text = $"Dia {dia}: Previsão indisponível";
-
-                if (lblClima.Text.Contains("°C"))
-                {
-                    var m = Regex.Match(lblClima.Text, @"(\d+)°C");
-                    if (m.Success)
-                    {
-                        int t = int.Parse(m.Groups[1].Value);
-                        lblClima.ForeColor = t < 15 ? System.Drawing.Color.Blue : (t > 28 ? System.Drawing.Color.OrangeRed : System.Drawing.Color.Black);
-                    }
-                }
-            }
-            catch { lblClima.Text = "Erro Clima"; }
+                if (diff == 0) 
+        {
+            string condicao = res["description"]?.ToString() ?? "";
+            string icon = ObterIconeClima(condicao);
+            lblClima.Text = $"Hoje: {res["temp"]}°C - {condicao} {icon}";
         }
+        else if (diff < 10)
+        {
+            var f = res["forecast"]?[diff];
+            string condicao = f["description"]?.ToString() ?? "";
+            string icon = ObterIconeClima(condicao);
+            lblClima.Text = $"{f["weekday"]} ({dia}): {f["max"]}°C/{f["min"]}°C - {condicao} {icon}";
+        }
+        else lblClima.Text = $"Dia {dia}: Previsão indisponível";
+
+        if (lblClima.Text.Contains("°C"))
+        {
+            var m = Regex.Match(lblClima.Text, @"(\d+)°C");
+            if (m.Success)
+            {
+                int t = int.Parse(m.Groups[1].Value);
+                lblClima.ForeColor = t < 15 ? System.Drawing.Color.Blue : (t > 28 ? System.Drawing.Color.OrangeRed : System.Drawing.Color.Black);
+            }
+        }
+    }
+    catch { lblClima.Text = "Erro Clima"; }
+}
+
+private string ObterIconeClima(string condicao)
+{
+    condicao = condicao.ToLower();
+    if (condicao.Contains("chuva")) return "🌧️";
+    if (condicao.Contains("tempestade")) return "⛈️";
+    if (condicao.Contains("nublado")) return "☁️";
+    if (condicao.Contains("claro") || condicao.Contains("sol") || condicao.Contains("limpo")) return "☀️";
+    if (condicao.Contains("nuvens") || condicao.Contains("parcial")) return "⛅";
+    return "🌡️";
+}        
 
         private List<DataRow> OrdenarPorHorario(List<DataRow> l)
         {
@@ -1291,15 +1383,19 @@ namespace Escala
 // =========================================================
 // CLASSE EXTRA: GERENCIADOR (Pode ficar no mesmo arquivo)
 // =========================================================
+
+
 public class FormGerenciar : Form
 {
     private ListBox lbPostos, lbHorarios;
-    private TextBox txtPosto, txtHorario, txtHorarioPadrao; // Adicionado txtHorarioPadrao
-    private Button btnAddPosto, btnDelPosto, btnAddHorario, btnDelHorario, btnSalvarPadrao; // Adicionado btnSalvarPadrao
+    private TextBox txtPosto, txtHorario, txtHorarioPadrao;
+    private ComboBox CbHorarioPadraoFolguista; // ComboBox para o Folguista
+    private ComboBox cbHorarioPadrao; // Novo ComboBox para o Intermediário
+    private Button btnAddPosto, btnDelPosto, btnAddHorario, btnDelHorario, btnSalvarPadrao, btnSalvarIntermediario;
 
     public FormGerenciar()
     {
-        Text = "Gerenciar Listas e Configurações"; Size = new Size(500, 450); StartPosition = FormStartPosition.CenterParent;
+        Text = "Gerenciar Listas e Configurações"; Size = new Size(500, 500); StartPosition = FormStartPosition.CenterParent;
         TabControl tabs = new TabControl { Dock = DockStyle.Fill };
 
         // -------------------------------------------------------
@@ -1316,7 +1412,7 @@ public class FormGerenciar : Form
         tabP.Controls.AddRange(new Control[] { lbPostos, txtPosto, btnAddPosto, btnDelPosto });
 
         // -------------------------------------------------------
-        // ABA 2: HORÁRIOS (Lista para Combobox)
+        // ABA 2: HORÁRIOS (Lista para Colunas)
         // -------------------------------------------------------
         TabPage tabH = new TabPage("Horários (Colunas)");
         lbHorarios = new ListBox { Location = new Point(10, 10), Size = new Size(200, 250) };
@@ -1329,25 +1425,61 @@ public class FormGerenciar : Form
         tabH.Controls.AddRange(new Control[] { lbHorarios, txtHorario, btnAddHorario, btnDelHorario });
 
         // -------------------------------------------------------
-        // ABA 3: CONFIGURAÇÕES (Onde define o padrão do folguista)
+        // ABA 3: FOLGUISTA (TextBox Simples)
         // -------------------------------------------------------
-        TabPage tabC = new TabPage("Configurações");
+        TabPage tabC = new TabPage("Horários folguistas");
         Label lblExplica = new Label { Text = "Horário Padrão do Folguista (Se ninguém faltar):", Location = new Point(10, 20), AutoSize = true, Font = new Font("Arial", 10, FontStyle.Bold) };
-        txtHorarioPadrao = new TextBox { Location = new Point(10, 50), Width = 200, Font = new Font("Arial", 12) }; // Ex: 12:40 x 21:00
+        CbHorarioPadraoFolguista = new ComboBox { Location = new Point(10, 50), Width = 200, Font = new Font("Arial", 12) }; // Ex: 12:40 x 21:00
+        CbHorarioPadraoFolguista.Items.AddRange(new object[] {
+             "07:00 X 15:20",
+             "09:40 X 18:00",
+             "10:40 X 19:00",
+             "11:40 X 20:00",
+             "12:40 X 21:00",
+             "16:40 X 01:00"
+         });
         btnSalvarPadrao = new Button { Text = "Salvar Padrão", Location = new Point(220, 48), Width = 100, Height = 30, BackColor = System.Drawing.Color.LightGreen };
 
         btnSalvarPadrao.Click += (s, e) =>
         {
-            DatabaseService.SetHorarioPadraoFolguista(txtHorarioPadrao.Text);
-            MessageBox.Show("Horário padrão atualizado!");
+            DatabaseService.SetHorarioPadraoFolguista(CbHorarioPadraoFolguista.Text);
+            MessageBox.Show("Horário do Folguista atualizado!");
+        };
+        tabC.Controls.AddRange(new Control[] { lblExplica, CbHorarioPadraoFolguista, btnSalvarPadrao });
+
+        // -------------------------------------------------------
+        // ABA 4: CFTV (INTERMEDIÁRIO) - ComboBox
+        // -------------------------------------------------------
+        TabPage tabD = new TabPage("CFTV (Intermediário)");
+        Label lblExplicaInter = new Label { Text = "Horário Padrão do Intermediário (12:40):", Location = new Point(10, 20), AutoSize = true, Font = new Font("Arial", 10, FontStyle.Bold) };
+
+        // ComboBox com opções pré-definidas
+        cbHorarioPadrao = new ComboBox { Location = new Point(10, 50), Width = 200, Font = new Font("Arial", 12), DropDownStyle = ComboBoxStyle.DropDown };
+        cbHorarioPadrao.Items.AddRange(new object[] {
+             "07:00 X 15:20",
+             "09:40 X 18:00",
+             "10:40 X 19:00",
+             "11:40 X 20:00",
+             "12:40 X 21:00",
+             "16:40 X 01:00"
+         });
+
+        btnSalvarIntermediario = new Button { Text = "Salvar Interm.", Location = new Point(220, 48), Width = 100, Height = 30, BackColor = System.Drawing.Color.LightGreen };
+
+        btnSalvarIntermediario.Click += (s, e) =>
+        {
+            // Salva o texto que estiver selecionado ou digitado no ComboBox
+            DatabaseService.SetHorarioPadraoIntermediario(cbHorarioPadrao.Text);
+            MessageBox.Show("Horário Intermediário atualizado!");
         };
 
-        tabC.Controls.AddRange(new Control[] { lblExplica, txtHorarioPadrao, btnSalvarPadrao });
+        tabD.Controls.AddRange(new Control[] { lblExplicaInter, cbHorarioPadrao, btnSalvarIntermediario });
 
         // Adiciona as abas
         tabs.TabPages.Add(tabP);
         tabs.TabPages.Add(tabH);
-        tabs.TabPages.Add(tabC); // Nova aba
+        tabs.TabPages.Add(tabC);
+        tabs.TabPages.Add(tabD); // Nova Aba
         Controls.Add(tabs);
 
         Carregar();
@@ -1364,9 +1496,11 @@ public class FormGerenciar : Form
         foreach (var h in DatabaseService.GetHorariosConfigurados()) lbHorarios.Items.Add(h);
 
         // Carrega o Horário Padrão do Folguista
-        txtHorarioPadrao.Text = DatabaseService.GetHorarioPadraoFolguista();
-    }
+        cbHorarioPadrao.Text = DatabaseService.GetHorarioPadraoFolguista();
 
+        // Carrega o Horário Padrão do Intermediário
+        cbHorarioPadrao.Text = DatabaseService.GetHorarioPadraoIntermediario();
+    }
 }
 
 public static class ExtensionMethods
