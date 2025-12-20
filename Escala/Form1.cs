@@ -11,8 +11,12 @@ using System.Windows.Forms;
 
 namespace Escala
 {
+
     public partial class Form1 : Form
     {
+        private bool _atualizandoSistema = false; // <--- ADICIONE ISSO
+                                                  // No Form1_Load ou Construtor
+
         // =========================================================
         // 1. CONFIGURAÇÕES
         // =========================================================
@@ -22,12 +26,10 @@ namespace Escala
         private const int INDEX_ORDEM = 3;
         private const int INDEX_NOME = 4;
         private const int INDEX_DIA_INICIO = 5;
-
         private DataTable? _tabelaMensal;
         private int _diaSelecionado = 1;
         private int _paginaAtual = 0;
         private JObject? _previsaoCompleta;
-
         public Form1()
         {
             InitializeComponent();
@@ -50,24 +52,31 @@ namespace Escala
                 // Eventos
                 dataGridView2.CellEnter += DataGridView2_CellEnter;
                 dataGridView2.CurrentCellDirtyStateChanged += DataGridView2_CurrentCellDirtyStateChanged;
-                dataGridView2.KeyDown += DataGridView2_KeyDown;
+                // dataGridView2.KeyDown += DataGridView2_KeyDown; // REMOVIDO: Evitar que DELETE apague dados
                 dataGridView2.CellValueChanged += DataGridView2_CellValueChanged;
                 dataGridView2.CellPainting += DataGridView2_CellPainting;
                 dataGridView2.RowPostPaint += DataGridView2_RowPostPaint;
+
             }
             // Dentro de public Form1()
-           
+
             dataGridView2.DataError += DataGridView2_DataError;
             if (tabControl1 != null)
             {
                 tabControl1.SelectedIndexChanged += TabControl1_SelectedIndexChanged;
             }
+
+            this.FormClosing += Form1_FormClosing;
         }
+
+
+
 
         private void Form1_Load(object? sender, EventArgs e)
         {
             try
             {
+                IniciarBotEmBackground();
                 DatabaseService.Initialize();
                 _tabelaMensal = DatabaseService.GetMonthlyData();
 
@@ -77,8 +86,10 @@ namespace Escala
                     dataGridView1.Columns.Clear();
                     dataGridView1.DataSource = _tabelaMensal;
                     ConfigurarGridMensal();
+                    dataGridView1.ReadOnly = true; // Ninguém mexe no visual do Excel
                 }
             }
+
             catch (Exception ex)
             {
                 MessageBox.Show("Erro ao carregar dados salvos: " + ex.Message);
@@ -95,6 +106,7 @@ namespace Escala
                 CbSeletorDia.SelectedIndex = (hoje <= 31) ? hoje - 1 : 0;
             }
 
+
             // Configurações Visuais Iniciais (DarkGray)
             if (flowLayoutPanel1 != null && dataGridView2 != null)
             {
@@ -107,6 +119,39 @@ namespace Escala
                 dataGridView2.GridColor = System.Drawing.Color.Black;
 
                 _ = AtualizarClimaAutomatico();
+            }
+        }
+
+
+        private void IniciarBotEmBackground()
+        {
+            // Verifica se o Node já está rodando (evita abrir 2 vezes)
+            if (System.Diagnostics.Process.GetProcessesByName("node").Length > 0) return;
+            if (System.Diagnostics.Process.GetProcessesByName("bot-estacionamento").Length > 0) return;
+
+            // Tenta abrir o arquivo .BAT que criamos (é o jeito mais seguro)
+            string caminhoBat = Path.Combine(Application.StartupPath, "iniciar.bat");
+
+            if (File.Exists(caminhoBat))
+            {
+                var procInfo = new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = caminhoBat,
+                    WorkingDirectory = Application.StartupPath, // Importante para o Node achar a pasta
+                    CreateNoWindow = false, // Deixe false para ver o QR Code se precisar
+                    WindowStyle = System.Diagnostics.ProcessWindowStyle.Normal,
+                    UseShellExecute = true
+                };
+                System.Diagnostics.Process.Start(procInfo);
+            }
+            else
+            {
+                // Fallback: Se não achar o .bat, tenta o .exe direto (se você tiver gerado)
+                string caminhoExe = Path.Combine(Application.StartupPath, "bot-estacionamento.exe");
+                if (File.Exists(caminhoExe))
+                {
+                    System.Diagnostics.Process.Start(caminhoExe);
+                }
             }
         }
 
@@ -150,7 +195,6 @@ namespace Escala
                 cell.Style.ForeColor = Color.White;
             }
         }
-
         // 2. Método que cria a linha preta de TOTAIS no final
         private void AdicionarLinhaTotaisVerticais(List<string> pessoas)
         {
@@ -229,7 +273,6 @@ namespace Escala
                         }
                     }
                 }
-
                 // ---------------------------------------------------------
                 // PARTE 2: DESENHAR O GRID
                 // ---------------------------------------------------------
@@ -304,16 +347,23 @@ namespace Escala
                 Cursor.Current = Cursors.Default;
             }
         }
-
         private void BtnGerenciarPostos_Click(object? sender, EventArgs e)
         {
+            // 1. Abre a janela de configurações
+            // O 'using' garante que a janela morra da memória assim que fechar
             using (var form = new FormGerenciar())
             {
-                form.ShowDialog();
+                form.ShowDialog(); // O código PAUSA aqui até você fechar a janela
+
+                // 2. Quando a janela fecha, o código continua aqui.
+                // As novas configurações (horários) já estão salvas no Banco pelo FormGerenciar.
+
+                // 3. Redesenhamos o dia atual!
+                // Como o ProcessarEscalaDoDia lê do Banco (Configurações) e do Excel (_tabelaMensal),
+                // ele vai atualizar a tela instantaneamente com as novas regras.
                 ProcessarEscalaDoDia();
             }
         }
-
         private void button1_Click(object? sender, EventArgs e)
         {
             OpenFileDialog ofd = new OpenFileDialog { Filter = "Excel|*.xlsx" };
@@ -354,13 +404,12 @@ namespace Escala
                 catch (Exception ex) { MessageBox.Show("Erro: " + ex.Message); }
             }
         }
-
         private void btnImprimir_Click(object? sender, EventArgs e)
         {
             // Salva a aba atual para voltar nela depois
             var abaAnterior = tabControl1.SelectedTab;
             // Força ir para a aba do grid inicialmente (para garantir que a primeira página saia certa)
-            tabControl1.SelectedTab = tabPage2; 
+            tabControl1.SelectedTab = tabPage2;
 
             PrintDocument pd = new PrintDocument();
             pd.DefaultPageSettings.Landscape = true;
@@ -370,14 +419,13 @@ namespace Escala
             PrintPreviewDialog ppd = new PrintPreviewDialog();
             ppd.Document = pd;
             ppd.WindowState = FormWindowState.Maximized;
-            
+
             // O Preview gera o documento. Durante este processo, o ImprimirConteudo vai trocar as abas.
             ppd.ShowDialog();
 
             // Restaura a aba que o usuário estava
             tabControl1.SelectedTab = abaAnterior;
         }
-
         private void CbSeletorDia_SelectedIndexChanged(object? sender, EventArgs e)
         {
             if (CbSeletorDia.SelectedItem != null)
@@ -391,7 +439,6 @@ namespace Escala
                 }
             }
         }
-
         private void btnRecarregarBanco_Click(object? sender, EventArgs e)
         {
             if (MessageBox.Show($"Limpar atribuições do Dia {_diaSelecionado}?", "Confirma", MessageBoxButtons.YesNo) == DialogResult.Yes)
@@ -400,7 +447,6 @@ namespace Escala
                 ProcessarEscalaDoDia();
             }
         }
-
         // =========================================================
         // PROCESSAMENTO PRINCIPAL
         // =========================================================
@@ -408,77 +454,90 @@ namespace Escala
         {
             if (_tabelaMensal == null || _tabelaMensal.Rows.Count == 0) return;
 
-            ConfigurarGridEscalaDiaria();
+            // 1. LIGA A TRAVA: Impede que o desenho dispare salvamentos errados
+            _atualizandoSistema = true;
 
-            int indiceColunaDia = INDEX_DIA_INICIO + (_diaSelecionado - 1);
-            if (indiceColunaDia >= _tabelaMensal.Columns.Count) return;
-
-            var listaSUP = new List<DataRow>();
-            var listaOP = new List<DataRow>();
-            var listaJV = new List<DataRow>();
-            var listaCFTV = new List<DataRow>(); // Essa lista vai receber o Windison agora
-            var listaFolga = new List<DataRow>();
-            var listaFerias = new List<DataRow>();
-
-            foreach (DataRow linha in _tabelaMensal.Rows)
+            try
             {
-                string nome = linha[INDEX_NOME]?.ToString() ?? "";
-                string horario = linha[INDEX_HORARIO]?.ToString() ?? ""; // "FOLGUISTA" está aqui
-                string funcao = (INDEX_FUNCAO < _tabelaMensal.Columns.Count) ? (linha[INDEX_FUNCAO]?.ToString()?.ToUpper() ?? "") : "";
-                string nomeUpper = nome.ToUpper();
+                ConfigurarGridEscalaDiaria(); // Limpa a tela do dia
 
-                if (string.IsNullOrWhiteSpace(nome) || nomeUpper.Contains("NOME")) continue;
+                int indiceColunaDia = INDEX_DIA_INICIO + (_diaSelecionado - 1);
+                if (indiceColunaDia >= _tabelaMensal.Columns.Count) return;
 
-                // --- CORREÇÃO DO ERRO AQUI ---
-                // Antes: if (!horario.Contains(":")) continue;
-                // Agora: Deixa passar se tiver ":" OU se estiver escrito "FOLGUISTA"
-                if (!horario.Contains(":") && !horario.ToUpper().Contains("FOLGUISTA") && !horario.ToUpper().Contains("SIV"))
-                    continue;
-                // -----------------------------
+                // Listas temporárias para separar os grupos
+                var listaSUP = new List<DataRow>();
+                var listaOP = new List<DataRow>();
+                var listaJV = new List<DataRow>();
+                var listaCFTV = new List<DataRow>();
+                var listaFolga = new List<DataRow>();
+                var listaFerias = new List<DataRow>();
 
-                string? statusNoDia = linha[indiceColunaDia]?.ToString()?.ToUpper().Trim();
+                // 2. LEITURA PURA DO EXCEL (Sem alterar nada nele)
+                foreach (DataRow linha in _tabelaMensal.Rows)
+                {
+                    string nome = linha[INDEX_NOME]?.ToString() ?? "";
+                    string horario = linha[INDEX_HORARIO]?.ToString() ?? "";
+                    string funcao = (INDEX_FUNCAO < _tabelaMensal.Columns.Count) ? (linha[INDEX_FUNCAO]?.ToString()?.ToUpper() ?? "") : "";
+                    string nomeUpper = nome.ToUpper();
 
-                if (new[] { "X", "FOLGA", "O" }.Contains(statusNoDia)) { listaFolga.Add(linha); continue; }
-                if (new[] { "F", "FERIAS", "FÉRIAS", "AT", "ATESTADO" }.Contains(statusNoDia)) { listaFerias.Add(linha); continue; }
+                    if (string.IsNullOrWhiteSpace(nome) || nomeUpper.Contains("NOME")) continue;
 
-                if (funcao.Contains("SUP") || funcao.Contains("LIDER") || nomeUpper.Contains("ISAIAS") || nomeUpper.Contains("ROGÉRIO"))
-                    listaSUP.Add(linha);
-                else if (funcao.Contains("JV") || funcao.Contains("APRENDIZ") || nomeUpper.Contains("JOAO"))
-                    listaJV.Add(linha);
-                else if (funcao.Contains("CFTV") || nomeUpper.Contains("CFTV"))
-                    listaCFTV.Add(linha); // O Windison vai cair aqui agora
-                else
-                    listaOP.Add(linha);
+                    // Filtro de horário válido
+                    if (!horario.Contains(":") && !horario.ToUpper().Contains("FOLGUISTA") && !horario.ToUpper().Contains("SIV"))
+                        continue;
+
+                    string? statusNoDia = linha[indiceColunaDia]?.ToString()?.ToUpper().Trim();
+
+                    // Separação por categorias
+                    if (new[] { "X", "FOLGA", "O" }.Contains(statusNoDia)) { listaFolga.Add(linha); continue; }
+                    if (new[] { "F", "FERIAS", "FÉRIAS", "AT", "ATESTADO" }.Contains(statusNoDia)) { listaFerias.Add(linha); continue; }
+
+                    if (funcao.Contains("SUP") || funcao.Contains("LIDER") || nomeUpper.Contains("ISAIAS") || nomeUpper.Contains("ROGÉRIO"))
+                        listaSUP.Add(linha);
+                    else if (funcao.Contains("JV") || funcao.Contains("APRENDIZ") || nomeUpper.Contains("JOAO"))
+                        listaJV.Add(linha);
+                    else if (funcao.Contains("CFTV") || nomeUpper.Contains("CFTV"))
+                        listaCFTV.Add(linha);
+                    else
+                        listaOP.Add(linha);
+                }
+
+                // 3. CARREGA AS ALTERAÇÕES MANUAIS DESTE DIA ESPECÍFICO
+                var assignments = DatabaseService.GetAssignmentsForDay(_diaSelecionado);
+
+                // 4. DESENHA O GRID MESCLANDO EXCEL + BANCO
+                // O parâmetro 'assignments' garante que se houver edição manual, ela aparece.
+                InserirBloco("OPERADORES", OrdenarPorHorario(listaOP), true, assignments, indiceColunaDia);
+                InserirBloco("APRENDIZ", OrdenarPorHorario(listaJV), true, assignments, indiceColunaDia);
+                InserirBloco("CFTV", OrdenarPorHorario(listaCFTV), false, assignments, indiceColunaDia);
+
+                InserirListaSimples("FOLGA", listaFolga);
+                InserirListaSimples("FÉRIAS|ATESTADOS", listaFerias);
+
+                // 5. VISUALIZAÇÃO
+                CalcularTotais();
+                PintarHorarios();
+                PintarPostos();
+                PintarHorarioFunc();
+
+                // 6. LÓGICA AUTOMÁTICA (Agora passando o banco para ela respeitar)
+                // Precisamos atualizar seus métodos de lógica para receber 'assignments'
+                AplicarLogicaFolguistaCFTV(listaCFTV, assignments);
+                AplicarLogicaIntermediarioCFTV(listaCFTV, assignments);
+
+                if (flowLayoutPanel1 != null) AtualizarItinerarios();
             }
-
-            var assignments = DatabaseService.GetAssignmentsForDay(_diaSelecionado);
-
-            // Inserção no Grid
-            InserirBloco("OPERADORES", OrdenarPorHorario(listaOP), true, assignments);
-            InserirBloco("APRENDIZ", OrdenarPorHorario(listaJV), true, assignments);
-
-            // O Windison vai ser desenhado aqui
-            InserirBloco("CFTV", OrdenarPorHorario(listaCFTV), false, assignments);
-
-            InserirListaSimples("FOLGA", listaFolga);
-            InserirListaSimples("FÉRIAS|ATESTADOS", listaFerias);
-
-            CalcularTotais();
-            PintarHorarios();
-            PintarPostos();
-            PintarHorarioFunc();
-
-            // Agora a função vai encontrar o Windison na listaCFTV!
-            AplicarLogicaFolguistaCFTV(listaCFTV);
-            AplicarLogicaIntermediarioCFTV(listaCFTV);
-
-            if (flowLayoutPanel1 != null) AtualizarItinerarios();
+            finally
+            {
+                // 7. DESLIGA A TRAVA: Agora o usuário pode editar
+                _atualizandoSistema = false;
+            }
         }
-
-        private void AplicarLogicaFolguistaCFTV(List<DataRow> listaCFTV)
+        // Método Atualizado: Recebe assignments
+        private void AplicarLogicaFolguistaCFTV(List<DataRow> listaCFTV, Dictionary<string, Dictionary<string, string>> assignments)
         {
-            // 1. Identificar QUEM é o folguista
             string nomeDoFolguista = "";
+            // Identifica o folguista
             foreach (DataRow dados in listaCFTV)
             {
                 string horario = dados[INDEX_HORARIO]?.ToString()?.ToUpper() ?? "";
@@ -491,7 +550,15 @@ namespace Escala
 
             if (string.IsNullOrEmpty(nomeDoFolguista)) return;
 
-            // 2. Encontrar a linha visual no Grid
+            // Respeita edição manual do banco
+            if (assignments.ContainsKey(nomeDoFolguista) &&
+                assignments[nomeDoFolguista].ContainsKey("HORARIO") &&
+                !string.IsNullOrWhiteSpace(assignments[nomeDoFolguista]["HORARIO"]))
+            {
+                return;
+            }
+
+            // Acha a linha no grid
             DataGridViewRow rowFolguista = null;
             foreach (DataGridViewRow row in dataGridView2.Rows)
             {
@@ -505,92 +572,73 @@ namespace Escala
 
             if (rowFolguista == null) return;
 
-            // 3. Reset visual (Cinza)
-            for (int c = 3; c < dataGridView2.Columns.Count; c++)
-            {
-                rowFolguista.Cells[c].Style.BackColor = System.Drawing.Color.DarkGray;
-                rowFolguista.Cells[c].Style.ForeColor = System.Drawing.Color.White;
-                rowFolguista.Cells[c].ReadOnly = true;
-            }
+            // --- REMOVI O LOOP DE RESET/BLOQUEIO DAQUI ---
 
-            // -----------------------------------------------------------
-            // 4. LÓGICA DE PRIORIDADES DE COBERTURA
-            // -----------------------------------------------------------
+            // Calcula o horário
             int colDia = INDEX_DIA_INICIO + (_diaSelecionado - 1);
-
-            // PADRÃO: Define o horário que ele faz se NINGUÉM faltar.
-            // Você tinha colocado vários IFs confusos. O correto é escolher um padrão.
-            // Busca do banco/arquivo. Se vier vazio, usa um fallback
             string horarioParaAssumir = DatabaseService.GetHorarioPadraoFolguista();
-            if (string.IsNullOrWhiteSpace(horarioParaAssumir)) horarioParaAssumir = "12:40 X 21:00";
-
-            bool achouFaltaPrioritaria = false; // Prioridade 1 (Noite)
-            bool achouAlgumaFalta = false;      // Prioridade 2 (Outros)
+            bool achouFaltaPrioritaria = false;
+            bool achouAlgumaFalta = false;
 
             foreach (DataRow pessoa in listaCFTV)
             {
-                string horarioPessoa = pessoa[INDEX_HORARIO]?.ToString()?.ToUpper() ?? "";
                 string nomePessoa = pessoa[INDEX_NOME].ToString().ToUpper();
-
-                // Pula o próprio folguista
                 if (nomePessoa == nomeDoFolguista) continue;
 
-                // Verifica Status de Falta
+                string horarioPessoa = pessoa[INDEX_HORARIO]?.ToString()?.ToUpper() ?? "";
                 string status = pessoa[colDia].ToString().ToUpper().Trim();
                 bool estaDeFolga = (status == "FOLGA" || status == "X" || status == "F" || status == "O" || status.Contains("FÉRIAS") || status.Contains("ATESTADO"));
 
                 if (estaDeFolga)
                 {
-                    // PRIORIDADE 1: Turno da Noite (16:40 ou saída 00:40/01:00)
                     if (horarioPessoa.Contains("16:40") || horarioPessoa.Contains("00:40"))
                     {
-                        horarioParaAssumir = pessoa[INDEX_HORARIO].ToString(); // Assume o horário exato da planilha
-                        achouFaltaPrioritaria = true;
-                        break; // Encontrou a prioridade máxima (Noite), para de procurar!
+                        horarioParaAssumir = pessoa[INDEX_HORARIO].ToString();
+                        break;
                     }
-
-                    // PRIORIDADE 2: Qualquer outro turno (apenas se ainda não achou uma prioridade 1)
                     if (!achouAlgumaFalta)
                     {
                         horarioParaAssumir = pessoa[INDEX_HORARIO].ToString();
                         achouAlgumaFalta = true;
-                        // Não damos break aqui porque ainda podemos achar uma prioridade 1 (16:40) mais pra frente na lista
                     }
                 }
             }
 
-            // 5. Aplica o horário decidido
+            // Aplica visualmente
             rowFolguista.Cells["HORARIO"].Value = horarioParaAssumir;
             var partes = horarioParaAssumir.Split(new[] { 'x', 'X' }, StringSplitOptions.RemoveEmptyEntries);
 
             if (partes.Length == 2)
             {
+                // Chama a pintura simples
                 PintarIntervaloBranco(rowFolguista, partes[0].Trim(), partes[1].Trim());
             }
         }
-        private void AplicarLogicaIntermediarioCFTV(List<DataRow> listaCFTV)
-        {
-            // 1. Define o Horário Padrão (Vindo do ComboBox da Aba 4)
-            string horarioPadrao = DatabaseService.GetHorarioPadraoIntermediario();
-            if (string.IsNullOrWhiteSpace(horarioPadrao)) horarioPadrao = "12:40 X 21:00";
 
-            // 2. Varre a lista procurando quem tem o horário "12:40 x 20:40"
+        // Método Atualizado: Recebe assignments
+        private void AplicarLogicaIntermediarioCFTV(List<DataRow> listaCFTV, Dictionary<string, Dictionary<string, string>> assignments)
+        {
+            string horarioPadrao = DatabaseService.GetHorarioPadraoIntermediario();
+
             foreach (DataRow dados in listaCFTV)
             {
                 string horarioExcel = dados[INDEX_HORARIO]?.ToString() ?? "";
                 string nome = dados[INDEX_NOME]?.ToString()?.ToUpper() ?? "";
 
-                // A LÓGICA CORRETA AGORA:
-                // Procura especificamente pelo texto "12:40" e "20:40" na mesma célula
                 if (horarioExcel.Contains("12:40") && horarioExcel.Contains("21:00"))
                 {
-                    // Achamos o Intermediário! Agora vamos achá-lo no Grid visual.
+                    // Respeita edição manual
+                    if (assignments.ContainsKey(nome) &&
+                        assignments[nome].ContainsKey("HORARIO") &&
+                        !string.IsNullOrWhiteSpace(assignments[nome]["HORARIO"]))
+                    {
+                        break;
+                    }
+
                     DataGridViewRow rowInter = null;
                     foreach (DataGridViewRow row in dataGridView2.Rows)
                     {
                         string nomeNoGrid = row.Cells["Nome"].Value?.ToString()?.ToUpper() ?? "";
-
-                        // Tenta achar o nome exato ou contendo parte
                         if (nomeNoGrid == nome || (nomeNoGrid.Contains(nome) && nome.Length > 3))
                         {
                             rowInter = row;
@@ -600,30 +648,20 @@ namespace Escala
 
                     if (rowInter != null)
                     {
-                        // 3. Reseta a cor para cinza (limpa formatações anteriores)
-                        for (int c = 3; c < dataGridView2.Columns.Count; c++)
-                        {
-                            rowInter.Cells[c].Style.BackColor = System.Drawing.Color.DarkGray;
-                            rowInter.Cells[c].Style.ForeColor = System.Drawing.Color.White;
-                            rowInter.Cells[c].ReadOnly = true;
-                        }
+                        // --- REMOVI O LOOP DE RESET/BLOQUEIO DAQUI ---
 
-                        // 4. Aplica o horário do ComboBox e Pinta de Branco
                         rowInter.Cells["HORARIO"].Value = horarioPadrao;
-
                         var partes = horarioPadrao.Split(new[] { 'x', 'X' }, StringSplitOptions.RemoveEmptyEntries);
+
                         if (partes.Length == 2)
                         {
                             PintarIntervaloBranco(rowInter, partes[0].Trim(), partes[1].Trim());
                         }
                     }
-                    // Como geralmente só tem 1 intermediário, podemos parar de procurar (break)
-                    // Se tiver mais de um, remova o 'break' abaixo.
                     break;
                 }
             }
         }
-
         private void PintarIntervaloBranco(DataGridViewRow row, string horaInicio, string horaFim)
         {
             if (TimeSpan.TryParse(horaInicio, out TimeSpan ini) && TimeSpan.TryParse(horaFim, out TimeSpan fim))
@@ -636,17 +674,31 @@ namespace Escala
                     if (TryParseHorario(header, out TimeSpan hIni, out TimeSpan hFim))
                     {
                         TimeSpan hFimAj = (hFim < hIni) ? hFim.Add(TimeSpan.FromHours(24)) : hFim;
+
+                        // Se estiver dentro do horário de trabalho
                         if (ini <= hIni && fimAj >= hFimAj)
                         {
                             row.Cells[c].Style.BackColor = System.Drawing.Color.White;
                             row.Cells[c].Style.ForeColor = System.Drawing.Color.Black;
-                            row.Cells[c].ReadOnly = false;
+
+                            // NÃO mexemos no ReadOnly. Se o grid permite edição, continua permitindo.
+                            // Se precisar FORÇAR que seja editável, descomente a linha abaixo:
+                            // row.Cells[c].ReadOnly = false; 
+                        }
+                        else
+                        {
+                            // LIMPEZA: Se não estiver no horário, garante que fique cinza (apagado)
+                            // Isso corrige o bug de "duplicar" horarios quando muda a logica
+                            if (row.Cells[c].Style.BackColor != System.Drawing.Color.DarkGray)
+                            {
+                                row.Cells[c].Style.BackColor = System.Drawing.Color.DarkGray;
+                                row.Cells[c].Style.ForeColor = System.Drawing.Color.White;
+                            }
                         }
                     }
                 }
             }
         }
-
         private void ConfigurarGridEscalaDiaria()
         {
             dataGridView2.Rows.Clear();
@@ -710,11 +762,9 @@ namespace Escala
             dataGridView2.Columns["HORARIO"].DefaultCellStyle = estiloFixo;
             dataGridView2.Columns["Nome"].DefaultCellStyle = estiloFixo;
         }
-
         // =========================================================
         // LÓGICA DE PINTURA E CORES
         // =========================================================
-
         private void PintarHorarios()
         {
             for (int r = 0; r < dataGridView2.Rows.Count; r++)
@@ -763,7 +813,6 @@ namespace Escala
                 }
             }
         }
-
         private void PintarPostos()
         {
             for (int r = 0; r < dataGridView2.Rows.Count; r++)
@@ -806,7 +855,6 @@ namespace Escala
                 }
             }
         }
-
         private void PintarHorarioFunc()
         {
             for (int r = 0; r < dataGridView2.Rows.Count; r++)
@@ -834,12 +882,10 @@ namespace Escala
                 }
             }
         }
-
         // =========================================================
         // MÉTODOS AUXILIARES
         // =========================================================
-
-        private void InserirBloco(string titulo, List<DataRow> lista, bool gerarCartao, Dictionary<string, Dictionary<string, string>> assignments = null)
+        private void InserirBloco(string titulo, List<DataRow> lista, bool gerarCartao, Dictionary<string, Dictionary<string, string>> assignments = null, int colIndex = -1)
         {
             if (lista.Count == 0) return;
 
@@ -853,13 +899,55 @@ namespace Escala
                 r.Cells["Nome"].Value = nome;
                 r.Tag = gerarCartao ? "GERAR" : "IGNORAR";
 
-                if (assignments != null && assignments.ContainsKey(nome))
+                string postoExcel = (colIndex >= 0 && item.Table.Columns.Count > colIndex)
+                                      ? item[colIndex]?.ToString()?.ToUpper().Trim() ?? ""
+                                      : "";
+
+                // Filtra valores que não são postos (ex: FOLGA, FÉRIAS, etc - embora as listas já separem, segurança extra)
+                if (new[] { "X", "FOLGA", "F", "FERIAS", "FÉRIAS", "AT", "ATESTADO", "O" }.Contains(postoExcel))
+                    postoExcel = "";
+
+                // Verifica se tem algo no banco
+                Dictionary<string, string> userPosts = null;
+                if (assignments != null && assignments.ContainsKey(nome)) userPosts = assignments[nome];
+
+                // Prioridade 1: Banco de Dados
+                if (userPosts != null)
                 {
-                    var userPosts = assignments[nome];
+                    // --- CORREÇÃO: Restaurar também o HORARIO se houver salvo ---
+                    // O banco salva usando o HeaderText, que é "HORÁRIO" (com acento)
+                    if (userPosts.ContainsKey("HORÁRIO"))
+                    {
+                        r.Cells["HORARIO"].Value = userPosts["HORÁRIO"];
+                    }
+                    else if (userPosts.ContainsKey("HORARIO")) // Fallback
+                    {
+                        r.Cells["HORARIO"].Value = userPosts["HORARIO"];
+                    }
+
                     for (int c = 3; c < dataGridView2.Columns.Count; c++)
                     {
                         string slot = dataGridView2.Columns[c].HeaderText;
-                        if (userPosts.ContainsKey(slot)) r.Cells[c].Value = userPosts[slot];
+                        if (userPosts.ContainsKey(slot))
+                        {
+                            r.Cells[c].Value = userPosts[slot];
+                        }
+                        else if (!string.IsNullOrEmpty(postoExcel))
+                        {
+                            // Se não tem no banco para esse horário, usa o do Excel
+                            r.Cells[c].Value = postoExcel;
+                        }
+                    }
+                }
+                else
+                {
+                    // Prioridade 2: Excel (se tiver valor válido)
+                    if (!string.IsNullOrEmpty(postoExcel))
+                    {
+                        for (int c = 3; c < dataGridView2.Columns.Count; c++)
+                        {
+                            r.Cells[c].Value = postoExcel;
+                        }
                     }
                 }
             }
@@ -872,7 +960,6 @@ namespace Escala
             rowT.DefaultCellStyle.ForeColor = System.Drawing.Color.Black;
             rowT.DefaultCellStyle.Font = new System.Drawing.Font("Bahnschrift Condensed", 12, FontStyle.Bold);
         }
-
         private void InserirListaSimples(string titulo, List<DataRow> lista)
         {
             if (lista.Count == 0) return;
@@ -888,24 +975,13 @@ namespace Escala
             row.DefaultCellStyle.Font = new System.Drawing.Font("Bahnschrift Condensed", 12, FontStyle.Bold);
             row.Height = 50;
         }
-
-        private void DataGridView2_KeyDown(object? sender, KeyEventArgs e)
-        {
-            if (e.KeyCode == Keys.Delete && dataGridView2.SelectedCells.Count > 0)
-            {
-                foreach (DataGridViewCell cell in dataGridView2.SelectedCells)
-                {
-                    if (cell.ColumnIndex <= 2) continue;
-                    cell.Value = "";
-                    cell.Style.BackColor = System.Drawing.Color.DarkGray;
-                }
-                e.Handled = true;
-                AtualizarItinerarios();
-            }
-        }
-
+        // REMOVIDO: O método DataGridView2_KeyDown apagava dados ao apertar DELETE.
+        // private void DataGridView2_KeyDown(object? sender, KeyEventArgs e) { ... }
         private void DataGridView2_CellValueChanged(object? sender, DataGridViewCellEventArgs e)
         {
+            // SEGUNDA TRAVA: Se for o sistema calculando, não salva no banco!
+            if (_atualizandoSistema) return;
+
             if (e.RowIndex < 0 || e.ColumnIndex < 3) return;
             var row = dataGridView2.Rows[e.RowIndex];
             if (row.Tag?.ToString() == "IGNORAR") return;
@@ -918,7 +994,6 @@ namespace Escala
 
             DatabaseService.SaveAssignment(_diaSelecionado, nome, timeSlot, valor);
         }
-
         // =========================================================
         // PINTURA CUSTOMIZADA (MERGE VISUAL)
         // =========================================================
@@ -935,7 +1010,6 @@ namespace Escala
 
             e.Graphics.DrawLine(Pens.Black, e.CellBounds.Left, e.CellBounds.Bottom - 1, e.CellBounds.Right, e.CellBounds.Bottom - 1);
         }
-
         private void DataGridView2_RowPostPaint(object? sender, DataGridViewRowPostPaintEventArgs e)
         {
             var row = dataGridView2.Rows[e.RowIndex];
@@ -953,7 +1027,6 @@ namespace Escala
             r.X += 5; r.Width -= 10;
             TextRenderer.DrawText(e.Graphics, texto, e.InheritedRowStyle.Font, r, e.InheritedRowStyle.ForeColor, flags);
         }
-
         // =========================================================
         // IMPRESSÃO E ITINERÁRIOS
         // =========================================================
@@ -970,7 +1043,7 @@ namespace Escala
             {
                 // GARANTIA: Ativa a aba do Grid e força o desenho
                 tabControl1.SelectedTab = tabPage2;
-                Application.DoEvents(); 
+                Application.DoEvents();
 
                 e.Graphics.DrawString($"Escala do Dia {_diaSelecionado}", fonteT, Brushes.Black, x, y);
                 y += 30;
@@ -995,7 +1068,7 @@ namespace Escala
             {
                 // GARANTIA: Ativa a aba de Itinerários e força o desenho
                 tabControl1.SelectedTab = tabPage3;
-                Application.DoEvents(); 
+                Application.DoEvents();
 
                 e.Graphics.DrawString("Itinerários", fonteT, Brushes.Black, x, y);
                 y += 40;
@@ -1016,7 +1089,6 @@ namespace Escala
                 _paginaAtual = 0;
             }
         }
-
         // =========================================================
         // OUTROS MÉTODOS (Helpers, Clima, etc)
         // =========================================================
@@ -1037,7 +1109,6 @@ namespace Escala
             }
             return dt;
         }
-
         private async Task AtualizarClimaAutomatico()
         {
             try
@@ -1051,7 +1122,6 @@ namespace Escala
             }
             catch { lblClima.Text = "Clima offline"; }
         }
-
         private void AtualizarClimaParaDia(int dia)
         {
             if (_previsaoCompleta == null) { lblClima.Text = "Carregando..."; return; }
@@ -1063,51 +1133,48 @@ namespace Escala
                 if (alvo < hoje.Date) alvo = alvo.AddMonths(1);
                 int diff = (alvo - hoje.Date).Days;
 
-                if (diff == 0) 
-        {
-            string condicao = res["description"]?.ToString() ?? "";
-            string icon = ObterIconeClima(condicao);
-            lblClima.Text = $"Hoje: {res["temp"]}°C - {condicao} {icon}";
-        }
-        else if (diff < 10)
-        {
-            var f = res["forecast"]?[diff];
-            string condicao = f["description"]?.ToString() ?? "";
-            string icon = ObterIconeClima(condicao);
-            lblClima.Text = $"{f["weekday"]} ({dia}): {f["max"]}°C/{f["min"]}°C - {condicao} {icon}";
-        }
-        else lblClima.Text = $"Dia {dia}: Previsão indisponível";
+                if (diff == 0)
+                {
+                    string condicao = res["description"]?.ToString() ?? "";
+                    string icon = ObterIconeClima(condicao);
+                    lblClima.Text = $"Hoje: {res["temp"]}°C - {condicao} {icon}";
+                }
+                else if (diff < 10)
+                {
+                    var f = res["forecast"]?[diff];
+                    string condicao = f["description"]?.ToString() ?? "";
+                    string icon = ObterIconeClima(condicao);
+                    lblClima.Text = $"{f["weekday"]} ({dia}): {f["max"]}°C/{f["min"]}°C - {condicao} {icon}";
+                }
+                else lblClima.Text = $"Dia {dia}: Previsão indisponível";
 
-        if (lblClima.Text.Contains("°C"))
-        {
-            var m = Regex.Match(lblClima.Text, @"(\d+)°C");
-            if (m.Success)
-            {
-                int t = int.Parse(m.Groups[1].Value);
-                lblClima.ForeColor = t < 15 ? System.Drawing.Color.Blue : (t > 28 ? System.Drawing.Color.OrangeRed : System.Drawing.Color.Black);
+                if (lblClima.Text.Contains("°C"))
+                {
+                    var m = Regex.Match(lblClima.Text, @"(\d+)°C");
+                    if (m.Success)
+                    {
+                        int t = int.Parse(m.Groups[1].Value);
+                        lblClima.ForeColor = t < 15 ? System.Drawing.Color.Blue : (t > 28 ? System.Drawing.Color.OrangeRed : System.Drawing.Color.Black);
+                    }
+                }
             }
+            catch { lblClima.Text = "Erro Clima"; }
         }
-    }
-    catch { lblClima.Text = "Erro Clima"; }
-}
-
-private string ObterIconeClima(string condicao)
-{
-    condicao = condicao.ToLower();
-    if (condicao.Contains("chuva")) return "🌧️";
-    if (condicao.Contains("tempestade")) return "⛈️";
-    if (condicao.Contains("nublado")) return "☁️";
-    if (condicao.Contains("claro") || condicao.Contains("sol") || condicao.Contains("limpo")) return "☀️";
-    if (condicao.Contains("nuvens") || condicao.Contains("parcial")) return "⛅";
-    return "🌡️";
-}        
-
+        private string ObterIconeClima(string condicao)
+        {
+            condicao = condicao.ToLower();
+            if (condicao.Contains("chuva")) return "🌧️";
+            if (condicao.Contains("tempestade")) return "⛈️";
+            if (condicao.Contains("nublado")) return "☁️";
+            if (condicao.Contains("claro") || condicao.Contains("sol") || condicao.Contains("limpo")) return "☀️";
+            if (condicao.Contains("nuvens") || condicao.Contains("parcial")) return "⛅";
+            return "🌡️";
+        }
         private List<DataRow> OrdenarPorHorario(List<DataRow> l)
         {
             return l.OrderBy(r => int.TryParse(r[INDEX_ORDEM]?.ToString(), out int o) ? o : 999)
                     .ThenBy(r => r[INDEX_HORARIO]?.ToString()).ToList();
         }
-
         private bool TryParseHorario(string? t, out TimeSpan i, out TimeSpan f)
         {
             i = f = TimeSpan.Zero;
@@ -1115,7 +1182,6 @@ private string ObterIconeClima(string condicao)
             var p = t.Split(new[] { 'x', 'X' }, StringSplitOptions.RemoveEmptyEntries);
             return p.Length == 2 && TimeSpan.TryParse(p[0].Trim(), out i) && TimeSpan.TryParse(p[1].Trim(), out f);
         }
-
         private void DataGridView2_CellEnter(object? sender, DataGridViewCellEventArgs e) { if (e.ColumnIndex > 1) SendKeys.Send("{F4}"); }
         private void DataGridView2_CurrentCellDirtyStateChanged(object? sender, EventArgs e)
 
@@ -1129,7 +1195,7 @@ private string ObterIconeClima(string condicao)
                 AtualizarItinerarios();
             }
         }
-                private void CalcularTotais()
+        private void CalcularTotais()
         {
             // Percorre todas as linhas para achar os cabeçalhos/rodapés (linhas amarelas)
             for (int i = 0; i < dataGridView2.Rows.Count; i++)
@@ -1168,18 +1234,17 @@ private string ObterIconeClima(string condicao)
 
                         // Escreve o total na linha amarela (se for 0, deixa vazio para limpar o visual)
                         dataGridView2.Rows[i].Cells[c].Value = count > 0 ? count.ToString() : "";
-                        
+
                         // Opcional: Centralizar para ficar bonito
-                        if (count > 0) 
+                        if (count > 0)
                         {
                             dataGridView2.Rows[i].Cells[c].Style.Alignment = DataGridViewContentAlignment.MiddleCenter;
-                            dataGridView2.Rows[i].Cells[c].Style.Font = new Font("Bahnschrift Condensed", 10, FontStyle.Bold); 
+                            dataGridView2.Rows[i].Cells[c].Style.Font = new Font("Bahnschrift Condensed", 10, FontStyle.Bold);
                         }
                     }
                 }
             }
         }
-
         private void AtualizarItinerarios()
         {
             if (flowLayoutPanel1 == null) return;
@@ -1206,7 +1271,6 @@ private string ObterIconeClima(string condicao)
             }
             flowLayoutPanel1.ResumeLayout();
         }
-
         private Panel CriarPainelCartao(CartaoFuncionario d)
         {
             Panel p = new Panel { Width = 200, AutoSize = true, BackColor = System.Drawing.Color.White, Margin = new Padding(10) };
@@ -1225,7 +1289,6 @@ private string ObterIconeClima(string condicao)
             }
             return p;
         }
-
         // Configuração Mensal
         private void ConfigurarGridMensal()
         {
@@ -1233,22 +1296,6 @@ private string ObterIconeClima(string condicao)
             dataGridView1.RowHeadersVisible = false;
             for (int i = 0; i <= INDEX_NOME; i++) dataGridView1.Columns[i].Frozen = true;
         }
-
-        // Classes Aninhadas
-        public class SeletorPlanilha : Form
-        {
-            public ComboBox CbPlanilhas;
-            private Button BtnOk;
-            public SeletorPlanilha(List<string> planilhas)
-            {
-                Size = new Size(300, 150); StartPosition = FormStartPosition.CenterScreen;
-                CbPlanilhas = new ComboBox { Left = 10, Top = 30, Width = 260, DataSource = planilhas, DropDownStyle = ComboBoxStyle.DropDownList };
-                BtnOk = new Button { Text = "OK", Left = 190, Top = 70, DialogResult = DialogResult.OK };
-                Controls.Add(new Label { Text = "Selecione a aba:", Left = 10, Top = 10 });
-                Controls.Add(CbPlanilhas); Controls.Add(BtnOk);
-            }
-        }
-
         private void btnExportar_Click(object sender, EventArgs e)
         {
 
@@ -1372,157 +1419,127 @@ private string ObterIconeClima(string condicao)
             // Importante para o contador funcionar: Diz pro grid "Aceite esse valor mesmo assim"
             e.Cancel = false;
         }
-    }
-}
-
-
-
-
-
-
-// =========================================================
-// CLASSE EXTRA: GERENCIADOR (Pode ficar no mesmo arquivo)
-// =========================================================
-
-
-public class FormGerenciar : Form
-{
-    private ListBox lbPostos, lbHorarios;
-    private TextBox txtPosto, txtHorario, txtHorarioPadrao;
-    private ComboBox CbHorarioPadraoFolguista; // ComboBox para o Folguista
-    private ComboBox cbHorarioPadrao; // Novo ComboBox para o Intermediário
-    private Button btnAddPosto, btnDelPosto, btnAddHorario, btnDelHorario, btnSalvarPadrao, btnSalvarIntermediario;
-
-    public FormGerenciar()
-    {
-        Text = "Gerenciar Listas e Configurações"; Size = new Size(500, 500); StartPosition = FormStartPosition.CenterParent;
-        TabControl tabs = new TabControl { Dock = DockStyle.Fill };
-
-        // -------------------------------------------------------
-        // ABA 1: POSTOS
-        // -------------------------------------------------------
-        TabPage tabP = new TabPage("Postos");
-        lbPostos = new ListBox { Location = new Point(10, 10), Size = new Size(200, 250) };
-        txtPosto = new TextBox { Location = new Point(220, 10), Size = new Size(150, 23) };
-        btnAddPosto = new Button { Text = "Add", Location = new Point(220, 40) };
-        btnDelPosto = new Button { Text = "Del", Location = new Point(10, 270), BackColor = System.Drawing.Color.LightCoral };
-
-        btnAddPosto.Click += (s, e) => { if (!string.IsNullOrEmpty(txtPosto.Text)) { DatabaseService.AdicionarPosto(txtPosto.Text); Carregar(); txtPosto.Clear(); } };
-        btnDelPosto.Click += (s, e) => { if (lbPostos.SelectedItem != null) { DatabaseService.RemoverPosto(lbPostos.SelectedItem.ToString()); Carregar(); } };
-        tabP.Controls.AddRange(new Control[] { lbPostos, txtPosto, btnAddPosto, btnDelPosto });
-
-        // -------------------------------------------------------
-        // ABA 2: HORÁRIOS (Lista para Colunas)
-        // -------------------------------------------------------
-        TabPage tabH = new TabPage("Horários (Colunas)");
-        lbHorarios = new ListBox { Location = new Point(10, 10), Size = new Size(200, 250) };
-        txtHorario = new TextBox { Location = new Point(220, 10), Size = new Size(150, 23) };
-        btnAddHorario = new Button { Text = "Add", Location = new Point(220, 40) };
-        btnDelHorario = new Button { Text = "Del", Location = new Point(10, 270), BackColor = System.Drawing.Color.LightCoral };
-
-        btnAddHorario.Click += (s, e) => { if (!string.IsNullOrEmpty(txtHorario.Text)) { DatabaseService.AdicionarHorario(txtHorario.Text); Carregar(); txtHorario.Clear(); } };
-        btnDelHorario.Click += (s, e) => { if (lbHorarios.SelectedItem != null) { DatabaseService.RemoverHorario(lbHorarios.SelectedItem.ToString()); Carregar(); } };
-        tabH.Controls.AddRange(new Control[] { lbHorarios, txtHorario, btnAddHorario, btnDelHorario });
-
-        // -------------------------------------------------------
-        // ABA 3: FOLGUISTA (TextBox Simples)
-        // -------------------------------------------------------
-        TabPage tabC = new TabPage("Horários folguistas");
-        Label lblExplica = new Label { Text = "Horário Padrão do Folguista (Se ninguém faltar):", Location = new Point(10, 20), AutoSize = true, Font = new Font("Arial", 10, FontStyle.Bold) };
-        CbHorarioPadraoFolguista = new ComboBox { Location = new Point(10, 50), Width = 200, Font = new Font("Arial", 12) }; // Ex: 12:40 x 21:00
-        CbHorarioPadraoFolguista.Items.AddRange(new object[] {
-             "07:00 X 15:20",
-             "09:40 X 18:00",
-             "10:40 X 19:00",
-             "11:40 X 20:00",
-             "12:40 X 21:00",
-             "16:40 X 01:00"
-         });
-        btnSalvarPadrao = new Button { Text = "Salvar Padrão", Location = new Point(220, 48), Width = 100, Height = 30, BackColor = System.Drawing.Color.LightGreen };
-
-        btnSalvarPadrao.Click += (s, e) =>
+        private Bitmap CapturarImagemDoGrid()
         {
-            DatabaseService.SetHorarioPadraoFolguista(CbHorarioPadraoFolguista.Text);
-            MessageBox.Show("Horário do Folguista atualizado!");
-        };
-        tabC.Controls.AddRange(new Control[] { lblExplica, CbHorarioPadraoFolguista, btnSalvarPadrao });
+            // 1. Guarda o tamanho original para não estragar a tela
+            int alturaOriginal = dataGridView2.Height;
+            int larguraOriginal = dataGridView2.Width;
+            bool scrollOriginal = dataGridView2.ScrollBars != ScrollBars.None;
 
-        // -------------------------------------------------------
-        // ABA 4: CFTV (INTERMEDIÁRIO) - ComboBox
-        // -------------------------------------------------------
-        TabPage tabD = new TabPage("CFTV (Intermediário)");
-        Label lblExplicaInter = new Label { Text = "Horário Padrão do Intermediário (12:40):", Location = new Point(10, 20), AutoSize = true, Font = new Font("Arial", 10, FontStyle.Bold) };
+            try
+            {
+                // 2. Remove barras de rolagem e expande o grid para caber TUDO
+                dataGridView2.ScrollBars = ScrollBars.None;
 
-        // ComboBox com opções pré-definidas
-        cbHorarioPadrao = new ComboBox { Location = new Point(10, 50), Width = 200, Font = new Font("Arial", 12), DropDownStyle = ComboBoxStyle.DropDown };
-        cbHorarioPadrao.Items.AddRange(new object[] {
-             "07:00 X 15:20",
-             "09:40 X 18:00",
-             "10:40 X 19:00",
-             "11:40 X 20:00",
-             "12:40 X 21:00",
-             "16:40 X 01:00"
-         });
+                int alturaTotal = dataGridView2.ColumnHeadersHeight + (dataGridView2.Rows.Count * dataGridView2.RowTemplate.Height);
+                int larguraTotal = 0;
 
-        btnSalvarIntermediario = new Button { Text = "Salvar Interm.", Location = new Point(220, 48), Width = 100, Height = 30, BackColor = System.Drawing.Color.LightGreen };
+                foreach (DataGridViewColumn col in dataGridView2.Columns)
+                    if (col.Visible) larguraTotal += col.Width;
 
-        btnSalvarIntermediario.Click += (s, e) =>
+                // Adiciona um respiro visual
+                dataGridView2.Height = alturaTotal + 20;
+                dataGridView2.Width = larguraTotal + 20;
+
+                // 3. Cria a imagem em memória
+                Bitmap bmp = new Bitmap(dataGridView2.Width, dataGridView2.Height);
+
+                // 4. Desenha o Grid dentro da imagem
+                dataGridView2.DrawToBitmap(bmp, new Rectangle(0, 0, dataGridView2.Width, dataGridView2.Height));
+
+                return bmp;
+            }
+            finally
+            {
+                // 5. Restaura o Grid para o tamanho normal (Isso é CRUCIAL)
+                dataGridView2.Height = alturaOriginal;
+                dataGridView2.Width = larguraOriginal;
+                if (scrollOriginal) dataGridView2.ScrollBars = ScrollBars.Both;
+            }
+        }
+        private async Task EnviarParaApiNode(string caminhoImagem)
         {
-            // Salva o texto que estiver selecionado ou digitado no ComboBox
-            DatabaseService.SetHorarioPadraoIntermediario(cbHorarioPadrao.Text);
-            MessageBox.Show("Horário Intermediário atualizado!");
-        };
+            // Substitua pelo ID real do seu grupo (Descubra olhando o console do Node)
+            // IDs de grupo geralmente terminam com @g.us
+            string ID_DO_GRUPO = "554188807362-1423694264@g.us";
 
-        tabD.Controls.AddRange(new Control[] { lblExplicaInter, cbHorarioPadrao, btnSalvarIntermediario });
+            var payload = new
+            {
+                caminhoImagem = caminhoImagem,
+                grupoId = ID_DO_GRUPO,
+                legenda = $"Escala atualizada - Dia {_diaSelecionado} 📅"
+            };
 
-        // Adiciona as abas
-        tabs.TabPages.Add(tabP);
-        tabs.TabPages.Add(tabH);
-        tabs.TabPages.Add(tabC);
-        tabs.TabPages.Add(tabD); // Nova Aba
-        Controls.Add(tabs);
+            using (var client = new HttpClient())
+            {
+                try
+                {
+                    var json = Newtonsoft.Json.JsonConvert.SerializeObject(payload);
+                    var content = new StringContent(json, System.Text.Encoding.UTF8, "application/json");
 
-        Carregar();
+                    var response = await client.PostAsync("http://localhost:3000/enviar-escala", content);
+
+                    if (response.IsSuccessStatusCode)
+                    {
+                        MessageBox.Show("✅ Enviado para o Grupo com Sucesso!");
+                    }
+                    else
+                    {
+                        MessageBox.Show("❌ Erro no Bot: " + await response.Content.ReadAsStringAsync());
+                    }
+                }
+                catch (Exception ex)
+                {
+                    MessageBox.Show("❌ Erro de conexão com o Bot. Verifique se o server.exe está rodando.\n\n" + ex.Message);
+                }
+            }
+        }
+        private async void btnWhatsapp_Click(object sender, EventArgs e)
+        {
+            // 1. Gera o nome do arquivo temporário
+            string tempPath = Path.Combine(Path.GetTempPath(), "escala_temp.png");
+
+            try
+            {
+                Cursor.Current = Cursors.WaitCursor;
+
+                // 2. Gera a imagem usando seu método existente
+                using (Bitmap imagem = CapturarImagemDoGrid())
+                {
+                    imagem.Save(tempPath, System.Drawing.Imaging.ImageFormat.Png);
+                }
+
+                // 3. Manda para o Node
+                await EnviarParaApiNode(tempPath);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Erro: " + ex.Message);
+            }
+            finally
+            {
+                Cursor.Current = Cursors.Default;
+            }
+        }
+
+        private void Form1_FormClosing(object sender, FormClosingEventArgs e)
+        {
+            try
+            {
+                // Procura e mata o processo do bot e do node ao fechar o sistema
+                foreach (var process in System.Diagnostics.Process.GetProcessesByName("node"))
+                {
+                    process.Kill();
+                }
+                foreach (var process in System.Diagnostics.Process.GetProcessesByName("bot-estacionamento"))
+                {
+                    process.Kill();
+                }
+            }
+            catch
+            {
+                // Se der erro ao fechar, apenas ignora
+            }
+        }
     }
-
-    private void Carregar()
-    {
-        // Carrega Postos
-        lbPostos.Items.Clear();
-        foreach (var p in DatabaseService.GetPostosConfigurados()) lbPostos.Items.Add(p);
-
-        // Carrega Horários das Colunas
-        lbHorarios.Items.Clear();
-        foreach (var h in DatabaseService.GetHorariosConfigurados()) lbHorarios.Items.Add(h);
-
-        // Carrega o Horário Padrão do Folguista
-        cbHorarioPadrao.Text = DatabaseService.GetHorarioPadraoFolguista();
-
-        // Carrega o Horário Padrão do Intermediário
-        cbHorarioPadrao.Text = DatabaseService.GetHorarioPadraoIntermediario();
-    }
-}
-
-public static class ExtensionMethods
-{
-    public static void DoubleBuffered(this DataGridView dgv, bool setting)
-    {
-        Type dgvType = dgv.GetType();
-        System.Reflection.PropertyInfo? pi = dgvType.GetProperty("DoubleBuffered", System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
-        if (pi != null) pi.SetValue(dgv, setting, null);
-    }
-}
-
-public class ItemItinerario
-{
-    public string? Horario { get; set; }
-    public string? Posto { get; set; }
-    public System.Drawing.Color CorFundo { get; set; }
-    public System.Drawing.Color CorTexto { get; set; }
-}
-
-public class CartaoFuncionario
-{
-    public string? Nome { get; set; }
-    public List<ItemItinerario> Itens { get; set; } = new List<ItemItinerario>();
 }

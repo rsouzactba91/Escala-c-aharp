@@ -47,6 +47,7 @@
             lblClima = new Label();
             BtnGerenciarPostos = new Button();
             btnExportar = new Button();
+            btnWhatsapp = new Button();
             tabPage2.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)dataGridView2).BeginInit();
             tabPage1.SuspendLayout();
@@ -70,16 +71,16 @@
             // 
             btnImportar.Location = new Point(394, 3);
             btnImportar.Name = "btnImportar";
-            btnImportar.Size = new Size(115, 44);
+            btnImportar.Size = new Size(91, 44);
             btnImportar.TabIndex = 2;
             btnImportar.Text = "Carregar escala mensal";
             btnImportar.UseVisualStyleBackColor = true;
             // 
             // btnRecarregarBanco
             // 
-            btnRecarregarBanco.Location = new Point(515, 3);
+            btnRecarregarBanco.Location = new Point(491, 3);
             btnRecarregarBanco.Name = "btnRecarregarBanco";
-            btnRecarregarBanco.Size = new Size(115, 44);
+            btnRecarregarBanco.Size = new Size(91, 44);
             btnRecarregarBanco.TabIndex = 3;
             btnRecarregarBanco.Text = "Limpar Horários";
             btnRecarregarBanco.UseVisualStyleBackColor = true;
@@ -87,9 +88,9 @@
             // 
             // btnImprimir
             // 
-            btnImprimir.Location = new Point(636, 3);
+            btnImprimir.Location = new Point(588, 3);
             btnImprimir.Name = "btnImprimir";
-            btnImprimir.Size = new Size(115, 44);
+            btnImprimir.Size = new Size(91, 44);
             btnImprimir.TabIndex = 4;
             btnImprimir.Text = "Imprimir";
             btnImprimir.UseVisualStyleBackColor = true;
@@ -215,28 +216,39 @@
             // 
             // BtnGerenciarPostos
             // 
-            BtnGerenciarPostos.Location = new Point(757, 3);
+            BtnGerenciarPostos.Location = new Point(685, 3);
             BtnGerenciarPostos.Name = "BtnGerenciarPostos";
-            BtnGerenciarPostos.Size = new Size(115, 44);
+            BtnGerenciarPostos.Size = new Size(91, 44);
             BtnGerenciarPostos.TabIndex = 6;
             BtnGerenciarPostos.Text = "Configurações";
             BtnGerenciarPostos.UseVisualStyleBackColor = true;
             // 
             // btnExportar
             // 
-            btnExportar.Location = new Point(878, 3);
+            btnExportar.Location = new Point(884, 3);
             btnExportar.Name = "btnExportar";
-            btnExportar.Size = new Size(115, 44);
+            btnExportar.Size = new Size(91, 44);
             btnExportar.TabIndex = 7;
             btnExportar.Text = "Exportar";
             btnExportar.UseVisualStyleBackColor = true;
             btnExportar.Click += btnExportar_Click;
+            // 
+            // btnWhatsapp
+            // 
+            btnWhatsapp.Location = new Point(782, 3);
+            btnWhatsapp.Name = "btnWhatsapp";
+            btnWhatsapp.Size = new Size(91, 43);
+            btnWhatsapp.TabIndex = 8;
+            btnWhatsapp.Text = "Enviar para o Whatsapp";
+            btnWhatsapp.UseVisualStyleBackColor = true;
+            btnWhatsapp.Click += btnWhatsapp_Click;
             // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(1368, 698);
+            Controls.Add(btnWhatsapp);
             Controls.Add(btnExportar);
             Controls.Add(BtnGerenciarPostos);
             Controls.Add(lblClima);
@@ -278,5 +290,6 @@
         private Button btnExportar;
         private TabPage tabPage4;
         private DataGridView dataGridView3;
+        private Button btnWhatsapp;
     }
 }

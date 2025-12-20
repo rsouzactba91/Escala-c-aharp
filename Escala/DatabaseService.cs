@@ -17,7 +17,7 @@ namespace Escala
             {
                 connection.Open();
 
-                // 1. Existing Tables
+                // 1. Tabela Principal de Dados Mensais (Estilo Planilha)
                 var cmd = connection.CreateCommand();
                 cmd.CommandText = @"
                     CREATE TABLE IF NOT EXISTS MonthlyData (
@@ -39,7 +39,7 @@ namespace Escala
                 ";
                 cmd.ExecuteNonQuery();
 
-                // 2. New Tables for Configuration
+                // 2. Tabelas de Configuração (Postos, Horários e Configs Gerais)
                 var cmdConfig = connection.CreateCommand();
                 cmdConfig.CommandText = @"
                     CREATE TABLE IF NOT EXISTS ConfigPostos (
@@ -52,17 +52,22 @@ namespace Escala
                         Descricao TEXT UNIQUE, 
                         Ordem INTEGER
                     );
+
+                    -- NOVA TABELA: Substitui os arquivos .txt
+                    CREATE TABLE IF NOT EXISTS AppSettings (
+                        Chave TEXT PRIMARY KEY,
+                        Valor TEXT
+                    );
                 ";
                 cmdConfig.ExecuteNonQuery();
 
-                // Initialize Default Data if tables are empty
                 InicializarDadosPadrao(connection);
             }
         }
 
         private static void InicializarDadosPadrao(SqliteConnection conn)
         {
-            // Check and Init Postos
+            // Verifica e inicia Postos se estiver vazio
             var cmdCheckPostos = new SqliteCommand("SELECT COUNT(*) FROM ConfigPostos", conn);
             long countPostos = (long)cmdCheckPostos.ExecuteScalar();
 
@@ -77,7 +82,7 @@ namespace Escala
                 }
             }
 
-            // Check and Init Horarios
+            // Verifica e inicia Horários se estiver vazio
             var cmdCheckHorarios = new SqliteCommand("SELECT COUNT(*) FROM ConfigHorarios", conn);
             long countHorarios = (long)cmdCheckHorarios.ExecuteScalar();
 
@@ -102,7 +107,57 @@ namespace Escala
             }
         }
 
-        // --- Methods for Reading Configuration ---
+        // --- MÉTODOS GENÉRICOS PARA CONFIGURAÇÕES (SUBSTITUI OS ARQUIVOS TXT) ---
+
+        public static void SetSetting(string chave, string valor)
+        {
+            using (var conn = new SqliteConnection(ConnectionString))
+            {
+                conn.Open();
+                // INSERT OR REPLACE: Se já existe a chave, atualiza. Se não, cria.
+                var cmd = new SqliteCommand("INSERT OR REPLACE INTO AppSettings (Chave, Valor) VALUES (@k, @v)", conn);
+                cmd.Parameters.AddWithValue("@k", chave);
+                cmd.Parameters.AddWithValue("@v", valor);
+                cmd.ExecuteNonQuery();
+            }
+        }
+
+        public static string GetSetting(string chave, string valorPadrao)
+        {
+            using (var conn = new SqliteConnection(ConnectionString))
+            {
+                conn.Open();
+                var cmd = new SqliteCommand("SELECT Valor FROM AppSettings WHERE Chave = @k", conn);
+                cmd.Parameters.AddWithValue("@k", chave);
+                var result = cmd.ExecuteScalar();
+                return result != null ? result.ToString() : valorPadrao;
+            }
+        }
+
+        // --- MÉTODOS ESPECÍFICOS (Agora usam o banco internamente) ---
+
+        public static void SetHorarioPadraoFolguista(string horario)
+        {
+            SetSetting("HorarioFolguista", horario);
+        }
+
+        public static string GetHorarioPadraoFolguista()
+        {
+            return GetSetting("HorarioFolguista", "12:40 X 21:00");
+        }
+
+        public static void SetHorarioPadraoIntermediario(string horario)
+        {
+            SetSetting("HorarioIntermediario", horario);
+        }
+
+        public static string GetHorarioPadraoIntermediario()
+        {
+            return GetSetting("HorarioIntermediario", "12:40 X 21:00");
+        }
+
+
+        // --- DEMAIS MÉTODOS (MANTERAM-SE IGUAIS MAS ORGANIZADOS) ---
 
         public static List<string> GetPostosConfigurados()
         {
@@ -134,8 +189,6 @@ namespace Escala
             }
             return lista;
         }
-
-        // --- Methods for Modifying Configuration ---
 
         public static void AdicionarPosto(string nome)
         {
@@ -184,8 +237,6 @@ namespace Escala
                 cmd.ExecuteNonQuery();
             }
         }
-
-        // --- Existing Methods (Maintained) ---
 
         public static void SaveMonthlyData(DataTable dt)
         {
@@ -325,44 +376,6 @@ namespace Escala
                 cmd.Parameters.AddWithValue("@DateKey", $"Dia {dia}");
                 cmd.ExecuteNonQuery();
             }
-        }
-        private static string ConfigFile = "config_folguista.txt";
-
-        public static void SetHorarioPadraoFolguista(string horario)
-        {
-            try { System.IO.File.WriteAllText(ConfigFile, horario); } catch { }
-        }
-
-        public static string GetHorarioPadraoFolguista()
-        {
-            try
-            {
-                if (System.IO.File.Exists(ConfigFile))
-                    return System.IO.File.ReadAllText(ConfigFile);
-            }
-            catch { }
-
-            return "12:40 X 21:00"; // Retorna esse se não tiver nada salvo
-        }
-        // Coloque isso dentro da classe DatabaseService
-
-        private static string ConfigFileIntermediario = "config_intermediario.txt";
-
-        public static void SetHorarioPadraoIntermediario(string horario)
-        {
-            try { System.IO.File.WriteAllText(ConfigFileIntermediario, horario); } catch { }
-        }
-
-        public static string GetHorarioPadraoIntermediario()
-        {
-            try
-            {
-                if (System.IO.File.Exists(ConfigFileIntermediario))
-                    return System.IO.File.ReadAllText(ConfigFileIntermediario);
-            }
-            catch { }
-
-            return "12:40 X 21:00"; // Padrão se não tiver nada salvo
         }
     }
 }

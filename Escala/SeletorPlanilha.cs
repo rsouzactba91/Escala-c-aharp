@@ -1,8 +1,11 @@
+using System;
+using System.Collections.Generic; // Para List<>
+using System.Drawing; // Para Size, Point
+using System.Windows.Forms; // Para Form, Button, ComboBox
+
 namespace Escala
 {
-    /// <summary>
-    /// Diálogo para seleção de planilha/aba do Excel
-    /// </summary>
+    // Classe para selecionar qual aba do Excel importar
     public class SeletorPlanilha : Form
     {
         public ComboBox CbPlanilhas;
@@ -13,38 +16,34 @@ namespace Escala
             this.Text = "Selecione a Aba";
             this.Size = new Size(300, 150);
             this.StartPosition = FormStartPosition.CenterScreen;
-            this.FormBorderStyle = FormBorderStyle.FixedDialog;
+            this.FormBorderStyle = FormBorderStyle.FixedDialog; // Janela fixa
             this.MaximizeBox = false;
 
-            Label lbl = new Label()
-            {
-                Text = "Escolha a planilha:",
-                Left = 10,
-                Top = 10,
-                Width = 200
-            };
+            // Label
+            Controls.Add(new Label { Text = "Selecione a aba:", Left = 10, Top = 10 });
 
-            CbPlanilhas = new ComboBox()
+            // ComboBox
+            CbPlanilhas = new ComboBox
             {
                 Left = 10,
-                Top = 35,
+                Top = 30,
                 Width = 260,
+                DataSource = planilhas,
                 DropDownStyle = ComboBoxStyle.DropDownList
             };
-            CbPlanilhas.DataSource = planilhas;
+            Controls.Add(CbPlanilhas);
 
-            BtnOk = new Button()
+            // Botão OK
+            BtnOk = new Button
             {
-                Text = "Carregar",
+                Text = "OK",
                 Left = 190,
                 Top = 70,
-                Width = 80,
                 DialogResult = DialogResult.OK
             };
+            Controls.Add(BtnOk);
 
-            this.Controls.Add(lbl);
-            this.Controls.Add(CbPlanilhas);
-            this.Controls.Add(BtnOk);
+            // Define o botão padrão (Enter)
             this.AcceptButton = BtnOk;
         }
     }
