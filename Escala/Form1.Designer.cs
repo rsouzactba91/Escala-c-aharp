@@ -235,12 +235,15 @@
             // 
             // btnWhatsapp
             // 
+            btnWhatsapp.BackColor = Color.ForestGreen;
+            btnWhatsapp.Font = new Font("Segoe UI", 9F, FontStyle.Bold, GraphicsUnit.Point, 0);
+            btnWhatsapp.ForeColor = SystemColors.ControlLightLight;
             btnWhatsapp.Location = new Point(782, 3);
             btnWhatsapp.Name = "btnWhatsapp";
             btnWhatsapp.Size = new Size(91, 43);
             btnWhatsapp.TabIndex = 8;
-            btnWhatsapp.Text = "Enviar para o Whatsapp";
-            btnWhatsapp.UseVisualStyleBackColor = true;
+            btnWhatsapp.Text = "Enviar para o WhatsApp";
+            btnWhatsapp.UseVisualStyleBackColor = false;
             btnWhatsapp.Click += btnWhatsapp_Click;
             // 
             // Form1

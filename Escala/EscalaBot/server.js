@@ -69,7 +69,7 @@ async function connectToWhatsApp() {
     sock.ev.on('messages.upsert', async (m) => {
         if (m.type === 'notify') {
             const msg = m.messages[0];
-            if (!msg.key.fromMe && msg.key.remoteJid.includes('@g.us')) {
+            if (msg.key.fromMe && msg.key.remoteJid.includes('@g.us')) {
                 console.log(`📢 GRUPO ID: ${msg.key.remoteJid}`);
             }
         }

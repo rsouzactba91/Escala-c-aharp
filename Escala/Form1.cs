@@ -1461,7 +1461,9 @@ namespace Escala
         {
             // Substitua pelo ID real do seu grupo (Descubra olhando o console do Node)
             // IDs de grupo geralmente terminam com @g.us
-            string ID_DO_GRUPO = "554188807362-1423694264@g.us";
+            string ID_DO_GRUPO = "120363421902743004@g.us";
+            
+            //"554188807362-1423694264@g.us";
 
             var payload = new
             {
@@ -1496,32 +1498,43 @@ namespace Escala
         }
         private async void btnWhatsapp_Click(object sender, EventArgs e)
         {
-            // 1. Gera o nome do arquivo temporário
+            // 1. Tenta garantir que o bot está aberto
+            // Se já estiver aberto, ele não faz nada (graças à trava no inicio da função)
+            // Se estiver fechado, ele abre.
+            IniciarBotEmBackground();
+
+            // Verifica se precisou abrir agora (se não tinha node rodando antes)
+            // Se acabou de abrir, espera 5 segundos pro servidor subir
+            if (System.Diagnostics.Process.GetProcessesByName("node").Length == 0)
+            {
+                Cursor.Current = Cursors.WaitCursor;
+                await Task.Delay(5000); // Espera o Node carregar
+                Cursor.Current = Cursors.Default;
+            }
+
+            // 2. Tira o print e envia
             string tempPath = Path.Combine(Path.GetTempPath(), "escala_temp.png");
 
             try
             {
                 Cursor.Current = Cursors.WaitCursor;
 
-                // 2. Gera a imagem usando seu método existente
                 using (Bitmap imagem = CapturarImagemDoGrid())
                 {
                     imagem.Save(tempPath, System.Drawing.Imaging.ImageFormat.Png);
                 }
 
-                // 3. Manda para o Node
                 await EnviarParaApiNode(tempPath);
             }
             catch (Exception ex)
             {
-                MessageBox.Show("Erro: " + ex.Message);
+                MessageBox.Show("Erro no envio: " + ex.Message);
             }
             finally
             {
                 Cursor.Current = Cursors.Default;
             }
         }
-
         private void Form1_FormClosing(object sender, FormClosingEventArgs e)
         {
             try
