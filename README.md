@@ -1,18 +1,34 @@
-# Sistema de Escala (WinForms)
+Aplicação de Gerenciamento de Escalas
 
-Projeto desenvolvido em C# para gerenciar escalas de trabalho. A ideia principal é pegar uma tabela com a escala do mês inteiro e filtrar automaticamente para mostrar apenas a operação do dia (quem trabalha hoje).
+Objetivo:
+Esta aplicação foi criada para auxiliar no gerenciamento de escalas do setor, facilitando a visualização e controle dos dias de trabalho e das ausências dos funcionários.
 
-## O que o sistema faz
-1.  **Visão Mensal:** Permite lançar a escala de todos os funcionários para o mês.
-2.  **Visão Diária:** O sistema lê a escala mensal e gera uma lista só com quem está escalado para o dia atual.
-3.  **Clima:** Mostra a previsão do tempo de Curitiba/PR (via API) para ajudar no planejamento do dia.
+Funcionalidades:
 
-## Tecnologias
-* C# (Windows Forms)
-* Integração com API externa (HG Weather)
-* Manipulação de JSON
+Leitura da escala mensal: Importa dados de uma planilha Excel (.xlsx) contendo a escala completa do mês.
 
-## Status
-Em desenvolvimento. Atualmente trabalhando na lógica de conversão da grade mensal para diária.
+Geração da escala diária: A partir da escala mensal, gera a escala do dia solicitado, destacando funcionários que estão de:
 
----
+Folga
+
+Férias
+
+Atestado
+
+Outros status especiais conforme registrados na planilha
+
+Benefícios:
+
+Identificação rápida de quem está disponível ou ausente em determinado dia.
+
+Redução de erros e confusões na gestão de escalas.
+
+Facilita o planejamento e a organização do setor.
+
+Requisitos e Observações:
+
+Planilha Excel com a escala mensal organizada por funcionário e dia.
+
+A aplicação foi desenvolvida em C#, aproveitando a integração com Excel e buscando maior desempenho.
+
+A aplicação é geralmente mais rápida que o Excel, mas fica a critério da operação decidir se prefere utilizá-la ou não.
